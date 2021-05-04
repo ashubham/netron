@@ -1495,10 +1495,17 @@ view.ModelFactoryService = class {
     _unsupported(context) {
         const identifier = context.identifier;
         const extension = identifier.split('.').pop().toLowerCase();
-        const format = [ 'Zip', 'tar' ].find((extension) => context.entries(extension.toLowerCase()).length > 0);
-        if (format) {
+        const format = (module, format) => {
+            try {
+                module.Archive.open(context.stream);
+            }
+            catch (error) {
+                return;
+            }
             throw new view.Error("Invalid file content. File contains " + format + " archive in '" + identifier + "'.", true);
-        }
+        };
+        format(zip, 'Zip');
+        format(tar, 'tar');
         const knownUnsupportedIdentifiers = new Set([
             'natives_blob.bin',
             'v8_context_snapshot.bin',
@@ -1692,10 +1699,10 @@ view.ModelFactoryService = class {
     _openEntries(entries) {
         try {
             const files = entries.map((entry) => entry.name).filter((file) => !file.endsWith('/') && !file.split('/').pop().startsWith('.')).slice();
-            const values = files.filter((file) => !file.startsWith('PaxHeader/') && (!file.startsWith('.') || file.startsWith('./')));
+            const values = files.filter((file) => !file.startsWith('.') || file.startsWith('./'));
             const map = values.map((file) => file.split('/').slice(0, -1));
             const at = index => list => list[index];
-            const rotate = list => list[0].map((item, index) => list.map(at(index)));
+            const rotate = list => list.length === 0 ? [] : list[0].map((item, index) => list.map(at(index)));
             const equals = list => list.every((item) => item === list[0]);
             const folder = rotate(map).filter(equals).map(at(0)).join('/');
             const rootFolder = folder.length === 0 ? folder : folder + '/';

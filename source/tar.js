@@ -15,7 +15,10 @@ tar.Archive = class {
     constructor(stream) {
         this._entries = [];
         while (stream.position < stream.length) {
-            this._entries.push(new tar.Entry(stream));
+            const entry = new tar.Entry(stream);
+            if (entry.type === '0' || entry.type === '1' || entry.type === '2') {
+                this._entries.push(entry);
+            }
             if (stream.position + 512 > stream.length ||
                 stream.peek(512).every((value) => value === 0x00)) {
                 break;
@@ -48,10 +51,22 @@ tar.Entry = class {
         if (isNaN(checksum) || sum != checksum) {
             throw new tar.Error('Invalid tar archive.');
         }
-        reader.string(1); // link indicator
+        this._type = reader.string(1);
         reader.string(100); // name of linked file
+        if (reader.string(6) === 'ustar') {
+            reader.string(2); // ustar version
+            reader.string(32); // owner user name
+            reader.string(32); // owner group name
+            reader.string(8); // device major number
+            reader.string(8); // device number number
+            this._name = reader.string(155) + this._name;
+        }
         this._stream = stream.stream(size);
         stream.read(((size % 512) != 0) ? (512 - (size % 512)) : 0);
+    }
+
+    get type() {
+        return this._type;
     }
 
     get name() {
